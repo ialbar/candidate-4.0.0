@@ -111,6 +111,7 @@ interpolated_trajectory_struct ip_trajectory;	/*!< Struct that keeps interpolate
 circle_trajectory_struct circle_trajectory;		/*!< Struct that keeps trajectory in circle mode */
 PIDREG pv_control_pid = PIDREG_DEFAULTS;		/*!< PID struct for velocity control */
 PIDREG pv_control_pid_mms = PIDREG_DEFAULTS;		/*!< PID struct for velocity control */
+PIDREG am_control_pid_mms = PIDREG_DEFAULTS;		/*!< PID struct for velocity control */
 PIDCONTROLLER pv_position_control_pid = PIDCONTROLLER_DEFAULTS; /*!< PID struct for detents velocity control */
 #if 1
 PIDCONTROLLER pv_position_control_pid_test = PIDCONTROLLER_DEFAULTS; /*!< PID struct for detents velocity control */
@@ -193,6 +194,7 @@ extern short debug_velocity_target = 0;
 
 long long tmp_red = 0;
 
+manual_state_t manual_state = DETENTS_INACTIVE;	/*!< state of the manual mode */
 int in_quick_stop =0;
 
 //#define RESOLVER_DEBUG
@@ -1380,12 +1382,9 @@ void periodic_control_tsk(void)
 		}
 
 		/* check limits */
-		//check_potentiometer(&state);
+        check_hall_effect(manual_state);
 		check_overcurrent();
-		//TickDebugSci8bytes();
 		new_redundancy(&state);
-		//check_redundancy(&state);
-		//hybrid_check_redundancy(&state);
 		check_velocity_limit((long)Velocity_actual_value, &state);
 		check_position_limit((long)Position_actual_value, &state);
 		//Update position control loops
@@ -1413,173 +1412,6 @@ void periodic_control_tsk(void)
 	}
 }
 
-
-/*****************************************************************/
-/*!	function that checks the redundancy between the different encoders or
-	potentiometers to fix errors.
-	\param init '1' if it will be initialized in next cycle, '0' for normal test
-	\param state Cinematic state of the system
-	\return 1 if error, 0 if OK
-*/
-/*****************************************************************/
-int redundancy_test(int init, motion_state_struct *state)
-{
-	static short initialize = 0;
-	static long redundant_counter_abs = 0, redundant_abs_pos_offset = 0;
-	//static long redundant_counter_abs = 0,redundant_counter_vel = 0, redundant_vel_offset = 0, redundant_abs_pos_offset = 0;//redundant_counter_hybrid = 0, redundant_hybrid_offset = 0;
-	//long long temp = 0;
-	//unsigned long tmp_uns;
-	int err_value = 0;
-
-	if(init)	/* For initialization mode */
-	{
-		initialize = 1;
-		return 0;
-	}
-
-	if(initialize)
-	{
-		//redundant_vel_offset = state->vel_cntr - Position_actual_value_in_increments;
-		redundant_abs_pos_offset = state->abs_pos_cntr - Position_actual_value;
-		//redundant_hybrid_offset = 0; 													//TODO
-		initialize = 0;
-		return 0;
-	}
-
-	if(state) /* For normal redundancy test */
-	{
-		if( !Sensors_configuration_active )
-			return 0;
-
-		if( !homing_zeroed )
-			return 0;
-
-		/* If a potentiometer is used as an absolute position encoder */
-		if(abs_pos_counter != position_counter)
-		{
-			/* For the potentiometer comparison it is used 2*Following_error_window due to the potentiometer low resolution */
-			if(labs(state->abs_pos_cntr - Position_actual_value - redundant_abs_pos_offset) > 2*Following_error_window)
-			{
-				redundant_counter_abs++;
-			}
-			else
-			{
-				if(--redundant_counter_abs < 0)
-					redundant_counter_abs =0; /* If it doesn't make a mistake, then redundant_counter decreases*/
-			}
-		}
-
-		//if(velocity_counter != position_counter)
-		//{
-			// Calculates the difference
-		//	tmp_uns = labs(state->vel_cntr - Position_actual_value_in_increments - redundant_vel_offset);
-			// convert to external units
-		//	temp = (long long)tmp_uns * Position_factor_Feed_constant;
-		//	temp /= Position_factor_Numerator;//	 temp is the redundant encoder value in external units
-		//	if(temp > Following_error_window)
-		//	{
-		//		redundant_counter_vel++;
-		//	}
-		//	else
-		//	{
-		//		if(--redundant_counter_vel < 0)
-		//			redundant_counter_vel =0;
-		//	}
-		//}
-
-		/* If the hybrid sensor is used*/
-		/*if(used_by_control(10))
-		{
-			if(labs(state->hyb_pos_cntr - state->red_pos_cntr - redundant_hybrid_offset) > Hybrid_redundancy_error)
-			{
-				redundant_counter_hybrid++;
-			}
-			else
-			{
-				if(--redundant_counter_hybrid < 0)
-					redundant_counter_hybrid =0; // If it doesn't make a mistake, then redundant_counter decreases
-			}
-		}*/
-
-		/* When redundant_counter's are higher than a defined value, the function returns 1 to warn about it*/
-		//if(redundant_counter_abs >= REDUNDANCY_ERROR_FILTER || redundant_counter_vel >= REDUNDANCY_ERROR_FILTER)
-	    if(redundant_counter_abs >= REDUNDANCY_ERROR_FILTER)
-		{
-			//err_value = (redundant_counter_vel > redundant_counter_abs)?1:2;
-			//redundant_counter_vel = redundant_counter_abs = 0;
-	    	err_value = 2;
-	    	redundant_counter_abs = 0;
-			return err_value; //Returns 1 for encoder fault and 2 for potentiometer faults
-		}
-		/*if(redundant_counter_hybrid >= REDUNDANCY_ERROR_FILTER)
-		{
-			redundant_counter_hybrid = 0;
-			return 3; //Returns 3 for hybrid fault
-		}*/
-	}
-	return 0;
-}
-
-/*****************************************************************/
-/*!	function that checks the redundancy between the different encoders or
-	potentiometers to fix errors.
-	\param init '1' if it will be initialized in next cycle, '0' for normal test
-	\param state Cinematic state of the system
-	\return 1 if error, 0 if OK
-*/
-/*****************************************************************/
-int hybrid_redundancy_test(int init, motion_state_struct *state)
-{
-	static short initialize = 0;
-	static long redundant_counter_hybrid = 0, redundant_hybrid_offset = 0;
-	unsigned long tmp_uns;
-
-	if(init)	/* For initialization mode */
-	{
-		initialize = 1;
-		return 0;
-	}
-
-	if(initialize)
-	{
-		redundant_hybrid_offset = 0; 													//TODO
-		initialize = 0;
-		return 0;
-	}
-
-	if(state) /* For normal redundancy test */
-	{
-		if( !Sensors_configuration_active )
-			return 0;
-
-		if( !homing_zeroed )
-			return 0;
-
-		/* If the hybrid sensor is used*/
-		//if(used_by_control(10))
-		//{
-			tmp_uns = labs(state->hyb_pos_cntr - state->red_pos_cntr - redundant_hybrid_offset);
-			//Debug_long6 = tmp_uns;
-
-			if( tmp_uns > Hybrid_redundancy_error)
-			{
-				redundant_counter_hybrid++;
-			}
-			else
-			{
-				if(--redundant_counter_hybrid < 0)
-					redundant_counter_hybrid =0; // If it doesn't make a mistake, then redundant_counter decreases
-			}
-		//}
-
-		if(redundant_counter_hybrid >= REDUNDANCY_ERROR_FILTER)
-		{
-			redundant_counter_hybrid = 0;
-			return 3; //Returns 3 for hybrid fault
-		}
-	}
-	return 0;
-}
 
 unsigned int max(unsigned int num1, unsigned int num2, unsigned int num3, unsigned int num4, unsigned int num5) {
     unsigned int result = 0;
@@ -1730,7 +1562,8 @@ unsigned int get_max_error(void)
 
 void new_redundancy(motion_state_struct *state )
 {
-	static short new_redundancy = 0;
+	static short q_warning_redundancy_timer = 0;
+	static short d_warning_redundancy_timer = 0;
 
 	if(state) /* For normal redundancy test */
 	{
@@ -1742,123 +1575,44 @@ void new_redundancy(motion_state_struct *state )
 
 		New_redundancy_max_err = get_max_error();
 
-		if(New_redundancy_error_enable){
+		if(New_redundancy_error_enable)
+		{
 			if(labs(New_redundancy_max_err) > New_redundancy_error_window)
 			{
-				if(!new_redundancy)
+				d_warning_redundancy_timer = 0;
+				if(!q_warning_redundancy_timer)
 				{
-					new_redundancy = state->time;		/* Start time counting if not started */
+					q_warning_redundancy_timer = state->time;		/* Start time counting if not started */
 				}
-				tmp_red = (long long)(state->time - new_redundancy) * 1000;
+				tmp_red = (long long)(state->time - q_warning_redundancy_timer) * 1000;
 				tmp_red /= lcounts_p_s;
 				if(tmp_red > New_redundancy_error_timeout)
 				{
-//					if(!(isFaultActive(FAULT_REDUNDANCY)))
-//					{
-//						_ERRORmessage(0xFF07, 0x80, 0x0000, "Position redundancy error", 0, 0);
-//						setFault(FAULT_REDUNDANCY);
-//					}
-//					QueueFault(FAULT_REDUNDANCY);
 					QueueWarning(FAULT_REDUNDANCY);
 
 				}
-				//			else
-				//			{
-				//				DeQueueFault(FAULT_REDUNDANCY);
-				//				DeQueueWarning(FAULT_REDUNDANCY);
-				//			}
-			}
-			else
-			{
-				new_redundancy = 0;			/* stop time counting */
-				//			DeQueueFault(FAULT_REDUNDANCY);
-				DeQueueWarning(FAULT_REDUNDANCY);
-			}
 		}
 		else
 		{
-			//		DeQueueFault(FAULT_REDUNDANCY);
-			DeQueueWarning(FAULT_REDUNDANCY);
-		}
-	}
-}
-
-void check_redundancy( motion_state_struct *state )
-{
-	static short i_redundancy = 0;
-
-	/* Redundancy test every REDUNDANCY_N_CYCLES */
-	if( Enable_redundancy )
+				q_warning_redundancy_timer = 0;			/* stop time counting */
+				if(!d_warning_redundancy_timer)
 	{
-		if( redundancy_test(0, state) )
-		{
-			++i_redundancy;
+					d_warning_redundancy_timer = state->time;		/* Start time counting if not started */
 		}
 
-		i_redundancy = CLAMP( i_redundancy, 0, REDUNDANCY_N_CYCLES );
-
-		if( i_redundancy == REDUNDANCY_N_CYCLES )
+				tmp_red = (long long)(state->time - d_warning_redundancy_timer) * 1000;
+				tmp_red /= lcounts_p_s;
+				if(tmp_red > New_redundancy_error_timeout)
 		{
-//			if(!(isFaultActive(FAULT_REDUNDANCY)))
-//			{
-//				/* Set the Fault flag and the error information. Additional info */
-//				_ERRORmessage(0xFF07, 0x80, 0x0000, "Position redundancy error", 0, 0);
-//				setFault(FAULT_REDUNDANCY);
-//			}
-//			QueueFault(FAULT_REDUNDANCY);
-			QueueWarning(FAULT_REDUNDANCY);
-			i_redundancy = 0;
+					DeQueueWarning(FAULT_REDUNDANCY);
 		}
-		else if( i_redundancy == 0 )
-		{
-			//		DeQueueFault(FAULT_REDUNDANCY);
 		}
 	}
 	else
 	{
-		i_redundancy = 0;
-		DeQueueFault(FAULT_REDUNDANCY);
 		DeQueueWarning(FAULT_REDUNDANCY);
 	}
 }
-
-void hybrid_check_redundancy( motion_state_struct *state )
-{
-	static short i_redundancy = 0;
-
-	/* Redundancy test every REDUNDANCY_N_CYCLES */
-	if( Enable_hybrid_redundancy )
-	{
-		if( hybrid_redundancy_test(0, state) )
-		{
-			++i_redundancy;
-		}
-
-		i_redundancy = CLAMP( i_redundancy, 0, REDUNDANCY_N_CYCLES );
-
-		if( i_redundancy == REDUNDANCY_N_CYCLES )
-		{
-//			if(!(isFaultActive(FAULT_HYBRID_REDUNDANCY)))
-//			{
-//				/* Set the Fault flag and the error information. Additional info */
-//				_ERRORmessage(0xFF0B, 0x80, 0x0000, "Hybrid redundancy error", 0, 0);
-//				setFault(FAULT_HYBRID_REDUNDANCY);
-//			}
-//			QueueFault(FAULT_HYBRID_REDUNDANCY);
-			QueueWarning(FAULT_HYBRID_REDUNDANCY);
-			i_redundancy = 0;
-		}
-		else if( i_redundancy == 0 )
-		{
-			//			DeQueueFault(FAULT_HYBRID_REDUNDANCY);
-		}
-	}
-	else
-	{
-		i_redundancy = 0;
-		DeQueueFault(FAULT_HYBRID_REDUNDANCY);
-		DeQueueWarning(FAULT_HYBRID_REDUNDANCY);
-	}
 }
 
 
@@ -2898,20 +2652,11 @@ void load_ramp_time(int set)
 
 int manual_mode_back (motion_state_struct *state)
 {
-	long long tmp = 0;
-
 	/* filter velocity */
 	if (!apply_filters)
 	  return 0;
 
 	apply_filters = 0;
-	//redundancy_test(1, state);
-	//hybrid_redundancy_test(1, state);
-	/* If we are back from manual_with_cluth we have to reset filters and correct Home_offset */
-	//tmp = (long long)state->pos_prev * pos2int_factor_num;
-	//if(tmp >= 0) tmp += (pos2int_factor_den >> 1); else tmp -= (long long)(pos2int_factor_den >> 1);
-	//tmp /= pos2int_factor_den;
-	//Home_offset = state->abs_pos_cntr - int2ext_pos((long)tmp,0);  /* convert to external units not considering offset */
 	absolute_sensor = abs_pos_counter(SAVED_PARAMS);
 	Home_offset = absolute_sensor - int2ext_pos(state->position, 0); /* convert to external units not considering offset */
 	EQep1Regs.QEPCTL.bit.SWI = 0; /* Software init position counter */
@@ -3061,13 +2806,6 @@ void BLDC_apply_pwm(unsigned int positive, unsigned int negative, unsigned char 
 	  break;
     default:
 	  DISABLE_MOTOR;			/* disable motor drive */
-	  if(!(isFaultActive(FAULT_HALL)))
-	  {
-	   _ERRORmessage(0xFF0F, 0x80, 0x0000, "Hall effect sensor invalid", 0, 0);
-	   setFault(FAULT_HALL);
-	  }
-	  QueueFault(FAULT_HALL);
-	  //_LOGmessage(0x0026,"hall sensors state error : %x", hall_state, 0);
 	  break;
   }
 }
@@ -3102,6 +2840,41 @@ int detent_nearby(long current_pos, long *detent_pos)
 	return 0;		/* no nearby detent fount */
 }
 
+void check_hall_effect(manual_state_t manual_state)
+{
+	unsigned char hall_state_for_error = 0;
 
+	if ((motor != BLDC_MOTOR_a) && (motor != BLDC_MOTOR_b) && (motor != BLDC_MOTOR_c))
+	{
+		return;
+	}
+
+	hall_state_for_error=((GpioDataRegs.GPBDAT.all & 0x001D0000) >> 18);	// bits 0,1,2 = H1,H2,H3
+
+	if ((motor == BLDC_MOTOR_a) || (motor == BLDC_MOTOR_c))
+	{
+		hall_state_for_error ^= 7;
+	}
+
+	if ((hall_state_for_error >= 1) && (hall_state_for_error <=6))
+	{
+		DeQueueFault(FAULT_HALL);
+	}
+	else
+	{
+		if(((Modes_of_operation_display == OPERATION_MODE_MANUAL)||(Modes_of_operation_display == OPERATION_MODE_MANUAL_2))
+				&& manual_state != DETENTS_ACTIVE)
+			DeQueueFault(FAULT_HALL);
+		else{
+
+			if(!(isFaultActive(FAULT_HALL)))
+			{
+				_ERRORmessage(0xFF0F, 0x80, 0x0000, "Hall effect sensor invalid", 0, 0);
+				setFault(FAULT_HALL);
+			}
+			QueueFault(FAULT_HALL);
+		}
+	}
+}
 
 /*** end of file *****************************************************/

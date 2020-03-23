@@ -15,23 +15,15 @@
 static unsigned long active_faults = 0;		/*!< variable that tracks the faults that are still active */
 static unsigned long correcting_faults = 0;	/*!< variable that tracks the faults that are being corrected */
 
-static long long fault_pos_hybrid_redundancy_timer = 0;
-static long long fault_pos_redundancy_timer = 0;
 static long long fault_pos_following_timer = 0;
 static long long fault_vel_following_timer = 0;
 static long long fault_iron_cable_timer = 0;
 static long long fault_vel_limit_timer = 0;
 static long long fault_hall_timer = 0;
-static long long fault_ratchet_timer = 0;
 static long long fault_overcurrent_timer = 0;
 
-static long long fault_new_redundancy_timer = 0;
-static long long warning_new_redundancy_timer = 0;
 
 static unsigned long warning_faults = 0;
-static long long warning_pos_redundancy_timer = 0;
-static long long warning_pos_hybrid_redundancy_timer = 0;
-static long long warning_ratchet_timer = 0;
 static unsigned long current_faults = 0;
 
 short current_filt_to_check_overcurrent = 0;			/*!< Servo dc current measured in mA */
@@ -240,18 +232,6 @@ void fault_management(motion_state_struct *state)
 				correcting_faults &= ~FAULT_POS_FOLLOWING;
 				EINT;
 		}
-		if(correcting_faults & FAULT_REDUNDANCY)
-		{	/* a redundacy fault has been registered */
-			DINT;
-			correcting_faults &= ~FAULT_REDUNDANCY;		 /* no fault action, just disable voltage */
-			EINT;
-		}
-		if(correcting_faults & FAULT_HYBRID_REDUNDANCY)
-		{	/* a hybrid redundacy fault has been registered */
-			DINT;
-			correcting_faults &= ~FAULT_HYBRID_REDUNDANCY;		 /* no fault action, just disable voltage */
-			EINT;
-		}
 		if(correcting_faults & FAULT_VEL_LIMIT)
 		{	/* a velocity limit fault has been registered */
 			DINT;
@@ -317,13 +297,6 @@ void fault_management(motion_state_struct *state)
 			DISABLE_MOTOR;	/* all 6 PWM's off (free motor movement) */
 			DINT;
 			correcting_faults &= ~FAULT_ENCODER;
-			EINT;
-		}
-		if(correcting_faults & FAULT_RATCHET)
-		{
-			DISABLE_MOTOR;	/* all 6 PWM's off (free motor movement) */
-			DINT;
-			correcting_faults &= ~FAULT_RATCHET;
 			EINT;
 		}
 		if(correcting_faults & FAULT_UNUSED)
@@ -482,25 +455,6 @@ unsigned long unrecoverableFaults(void)
 		EMCY_errorRecovered(&amc_od_Data, 0x8611);	/* clear the error */
 	}
 
-	if(active_faults & FAULT_REDUNDANCY)
-	{	/* this fault is recoverable */
-		DINT;
-		//redundancy_test(1, (void *)NULL);
-		new_redundancy(((void *)NULL));
-		active_faults &= ~FAULT_REDUNDANCY;
-		EINT;
-		EMCY_errorRecovered(&amc_od_Data, 0xff07);	/* clear the error */
-	}
-
-//	if(active_faults & FAULT_HYBRID_REDUNDANCY)
-//	{	/* this fault is recoverable */
-//		DINT;
-//		hybrid_redundancy_test(1, (void *)NULL);
-//		active_faults &= ~FAULT_HYBRID_REDUNDANCY;
-//		EINT;
-//		EMCY_errorRecovered(&amc_od_Data, 0xff0B);	/* clear the error */
-//	}
-
 	if(active_faults & FAULT_VEL_LIMIT)
 	{
 		if( !(FAULT_VEL_LIMIT & GetQueuedFault()))
@@ -566,17 +520,6 @@ unsigned long unrecoverableFaults(void)
 			active_faults &= ~FAULT_ENCODER;
 			EINT;
 			EMCY_errorRecovered(&amc_od_Data, 0xFF05);	/* clear the error */
-		}
-	}
-
-	if(active_faults & FAULT_RATCHET)
-	{
-		if( !(FAULT_RATCHET & GetQueuedFault()))
-		{
-			DINT;
-			active_faults &= ~FAULT_RATCHET;
-			EINT;
-			EMCY_errorRecovered(&amc_od_Data, 0xFF04);	/* clear the error */
 		}
 	}
 
@@ -729,21 +672,6 @@ void QueueFault( unsigned long fault )
 			fault_vel_following_timer = getltime();
 		}
 	}
-	if( (fault & FAULT_REDUNDANCY) )
-	{
-		if( !(current_faults & FAULT_REDUNDANCY) )
-		{
-			//fault_pos_redundancy_timer = getltime();
-			fault_new_redundancy_timer = getltime();
-		}
-	}
-	if( (fault & FAULT_HYBRID_REDUNDANCY) )
-	{
-		if( !(current_faults & FAULT_HYBRID_REDUNDANCY) )
-		{
-			fault_pos_hybrid_redundancy_timer = getltime();
-		}
-	}
 	if( (fault & FAULT_IRON_CABLE_BREAK) )
 	{
 		if( !(current_faults & FAULT_IRON_CABLE_BREAK) )
@@ -763,14 +691,6 @@ void QueueFault( unsigned long fault )
 		if( !(current_faults & FAULT_HALL) )
 		{
 			fault_hall_timer = getltime();
-		}
-	}
-
-	if( (fault & FAULT_RATCHET) )
-	{
-		if( !(current_faults & FAULT_RATCHET) )
-		{
-			fault_ratchet_timer = getltime();
 		}
 	}
 
@@ -802,21 +722,6 @@ void DeQueueFault( unsigned long fault )
 			fault_vel_following_timer = 0;
 		}
 	}
-	if( (current_faults & FAULT_REDUNDANCY) )
-	{
-		if( (fault & FAULT_REDUNDANCY) )
-		{
-			//fault_pos_redundancy_timer = 0;
-			fault_new_redundancy_timer = 0;
-		}
-	}
-	if( (current_faults & FAULT_HYBRID_REDUNDANCY) )
-	{
-		if( (fault & FAULT_HYBRID_REDUNDANCY) )
-		{
-			fault_pos_hybrid_redundancy_timer = 0;
-		}
-	}
 	if( (current_faults & FAULT_IRON_CABLE_BREAK) )
 	{
 		if( (fault & FAULT_IRON_CABLE_BREAK) )
@@ -836,14 +741,6 @@ void DeQueueFault( unsigned long fault )
 		if( (fault & FAULT_HALL) )
 		{
 			fault_hall_timer = 0;
-		}
-	}
-
-	if( (current_faults & FAULT_RATCHET) )
-	{
-		if( (fault & FAULT_RATCHET) )
-		{
-			fault_ratchet_timer = 0;
 		}
 	}
 
@@ -881,27 +778,6 @@ void set_fault_flags(void)
 		tmp /= lcounts_p_s;
 		if(tmp > FAULT_VEL_FOLLOWING_ERROR_TIMEOUT )
 			DeQueueFault(FAULT_VEL_FOLLOWING);
-	}
-	if( fault_new_redundancy_timer )
-	{
-		tmp = (long long)(current_time - fault_new_redundancy_timer) * 1000;
-		tmp /= lcounts_p_s;
-		if(tmp > FAULT_REDUNDANCY_ERROR_TIMEOUT )
-			DeQueueFault(FAULT_REDUNDANCY);
-	}
-//	if( fault_pos_redundancy_timer )
-//	{
-//		tmp = (long long)(current_time - fault_pos_redundancy_timer) * 1000;
-//		tmp /= lcounts_p_s;
-//		if(tmp > FAULT_REDUNDANCY_ERROR_TIMEOUT )
-//			DeQueueFault(FAULT_REDUNDANCY);
-//	}
-	if( fault_pos_hybrid_redundancy_timer )
-	{
-		tmp = (long long)(current_time - fault_pos_hybrid_redundancy_timer) * 1000;
-		tmp /= lcounts_p_s;
-		if(tmp > FAULT_HYBRID_REDUNDANCY_ERROR_TIMEOUT )
-			DeQueueFault(FAULT_HYBRID_REDUNDANCY);
 	}
 	if( fault_iron_cable_timer )
 	{
@@ -941,85 +817,16 @@ void set_fault_flags(void)
 
 void QueueWarning( unsigned long fault )
 {
-	if( (fault & FAULT_REDUNDANCY) )
-	{
-		if( !(warning_faults & FAULT_REDUNDANCY) )
-		{
-			//warning_pos_redundancy_timer = getltime();
-			warning_new_redundancy_timer = getltime();
-		}
-	}
-	if( (fault & FAULT_HYBRID_REDUNDANCY) )
-	{
-		if( !(warning_faults & FAULT_HYBRID_REDUNDANCY) )
-		{
-			warning_pos_hybrid_redundancy_timer = getltime();
-		}
-	}
-	if( (fault & FAULT_RATCHET) )
-	{
-		if( !(warning_faults & FAULT_RATCHET) )
-		{
-			warning_ratchet_timer = getltime();
-		}
-	}
 	warning_faults |= fault;
 }
 
 void DeQueueWarning( unsigned long fault )
 {
-	if( (warning_faults & FAULT_REDUNDANCY) )
-	{
-		if( (fault & FAULT_REDUNDANCY) )
-		{
-			//warning_pos_redundancy_timer = 0;
-			warning_new_redundancy_timer = 0;
-		}
-	}
-	if( (warning_faults & FAULT_HYBRID_REDUNDANCY) )
-	{
-		if( (fault & FAULT_HYBRID_REDUNDANCY) )
-		{
-			warning_pos_hybrid_redundancy_timer = 0;
-		}
-	}
-	if( (warning_faults & FAULT_RATCHET) )
-	{
-		if( (fault & FAULT_RATCHET) )
-		{
-			warning_ratchet_timer = 0;
-		}
-	}
 	warning_faults &= ~fault;
 }
 
 void set_warning_flags(void)
 {
-	unsigned long long tmp =0;
-	long long current_time = getltime();
-
-//	if( warning_pos_redundancy_timer )
-//	{
-//		tmp = (long long)(current_time - warning_pos_redundancy_timer) * 1000;
-//		tmp /= lcounts_p_s;
-//		if(tmp > FAULT_REDUNDANCY_ERROR_TIMEOUT )
-//			DeQueueWarning(FAULT_REDUNDANCY);
-//	}
-	if( warning_new_redundancy_timer )
-	{
-		tmp = (long long)(current_time - warning_new_redundancy_timer) * 1000;
-		tmp /= lcounts_p_s;
-		if(tmp > FAULT_REDUNDANCY_ERROR_TIMEOUT )
-			DeQueueWarning(FAULT_REDUNDANCY);
-	}
-	if( warning_pos_hybrid_redundancy_timer )
-	{
-		tmp = (long long)(current_time - warning_pos_hybrid_redundancy_timer) * 1000;
-		tmp /= lcounts_p_s;
-		if(tmp > FAULT_HYBRID_REDUNDANCY_ERROR_TIMEOUT )
-			DeQueueWarning(FAULT_HYBRID_REDUNDANCY);
-	}
-
 	if( warning_faults )
 		Device_status_word |= WARNING_MASKBIT;  //set warning flag
 	else

@@ -2978,7 +2978,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                     		{ RW, int32,  4, (void*)&Enc2_velocity},
                     };
 
-                    /* index 0xFF51 :   Mapped NCE configuration */
+                    /* index 0xFF4B :   Mapped NCE configuration */
                     UNS8 amc_od_highestSubIndex_objFF4B = 6; /* number of subindex - 1*/
                     subindex amc_od_IndexFF4B[] =
                     {

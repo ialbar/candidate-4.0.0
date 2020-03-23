@@ -385,9 +385,6 @@ UNS32 On_ResetNodeUpdate(CO_Data* d, const indextable * unsused_indextable, UNS8
 UNS32 On_HomeoffsetUpdate(CO_Data* d, const indextable * unsused_indextable, UNS8 unsused_bSubindex)
 {
 	new_redundancy((void *)NULL);
-	//redundancy_test(1, (void *)NULL);
-	//hybrid_redundancy_test(1, (void *)NULL);
-
 	return 0;
 }
 

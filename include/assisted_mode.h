@@ -14,10 +14,11 @@ void assisted_mode_operation(motion_state_struct *state, char init );
 int am_check_params(void);
 void am_initialize(motion_state_struct *state);
 void am_status_flags( long target, unsigned long v_max );
-int am_position_limits_old( long vel, long vdemand, long pos, long *v_limit_max, long *v_limit_min );
 int am_position_limits(void);
 void am_set_max_vel(long int*);
 _iq am_position_controller(long, long, _iq , _iq);
 void am_detent_status_flags(manual_state_t manual_state, long int detent, motion_state_struct *state, short reset);
+
+_iq am_velocity_controller_mms(long int demand, long int velocity);
 
 #endif  /* end _ASSISTED_MODE_H_ definition */

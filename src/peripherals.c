@@ -732,17 +732,34 @@ void getMotionState(motion_state_struct *state)
 	//static unsigned int new_velocity_counter = 0;
 	unsigned int old_velocity_counter;
 	long long tmp;
-
+	INTEGER32 aux;
 
 	old_htime = htime;
 	htime = CLK_gethtime();
 
+	aux = AN1_position;
 	manage_AN1();
+	AN1_velocity = (AN1_position-aux)/(htime - old_htime);
+
+	aux = AN2_position;
 	manage_AN2();
+	AN2_velocity = (AN2_position-aux)/(htime - old_htime);
+
+	aux = NCE_position;
 	manage_NCE();
+	Enc1_velocity = (NCE_position-aux)/(htime - old_htime);
+
+	aux = Enc1_position;
 	manage_Enc1();
+	Enc1_velocity = (Enc1_position-aux)/(htime - old_htime);
+
+	aux = Enc2_position;
 	manage_Enc2();
+	Enc2_velocity = (Enc2_position-aux)/(htime - old_htime);
+
+	aux = Resolver_position;
 	manage_Resolver();
+	Resolver_velocity = (Resolver_position-aux)/(htime - old_htime);
 
 	//state->position = position_counter(SAVED_PARAMS);
 	state->pos_cntr = position_counter(SAVED_PARAMS);
@@ -1157,37 +1174,6 @@ void manageEnc(void)
 
 	/* read encoder 2 */
 	Encoder2_Value = get_Enc2(used_by_control(P_ENC2)?SAVED_PARAMS:INIT_PARAMS);
-
-	if (used_by_control(P_ENC1)){
-		if (FPGA_errors&0x0004){
-			if(!(isFaultActive(FAULT_ENCODER)))
-			{
-				_ERRORmessage(0xFF05, 0x80, 0x0000, "Encoder error", 0, 0);
-				setFault(FAULT_ENCODER);
-			}
-			QueueFault(FAULT_ENCODER);
-		}
-		else{
-			if(isFaultActive(FAULT_ENCODER)){
-				DeQueueFault(FAULT_ENCODER);
-			}
-		}
-	}
-	if (used_by_control(P_ENC2)){
-		if (FPGA_errors&0x0008){
-			if(!(isFaultActive(FAULT_ENCODER)))
-			{
-				_ERRORmessage(0xFF05, 0x80, 0x0000, "Encoder error", 0, 0);
-				setFault(FAULT_ENCODER);
-			}
-			QueueFault(FAULT_ENCODER);
-		}
-		else{
-			if(isFaultActive(FAULT_ENCODER)){
-				DeQueueFault(FAULT_ENCODER);
-			}
-		}
-	}
 }
 
 

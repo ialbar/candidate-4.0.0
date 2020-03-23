@@ -159,8 +159,6 @@ void periodic_control_function(void);
 unsigned int get_max_error(void);
 unsigned int max(unsigned int num1, unsigned int num2, unsigned int num3, unsigned int num4, unsigned int num5);
 void new_redundancy(motion_state_struct *state );
-void check_redundancy( motion_state_struct *state );
-void hybrid_check_redundancy( motion_state_struct *state );
 int  velocity_over_limit(long velocity, int assisted);
 void check_velocity_limit(long velocity, motion_state_struct *state);
 int  position_over_limit(long int position);
@@ -182,8 +180,6 @@ void manageLeds(void);
 void velocity_filter(long *value, int reset);
 void position_filter(long *value, int reset);
 long half_acc_t2(long acc, unsigned long time);
-int redundancy_test(int init, motion_state_struct *state);
-int hybrid_redundancy_test(int init, motion_state_struct *state);
 void resetNode(void);
 long int2ext_pos(long internal_pos, long offset);
 long ext2int_pos(long external_pos, long offset);
@@ -235,6 +231,7 @@ int manual_mode_back(motion_state_struct *state);
 
 void eval_hall_state(unsigned char hall_state, motor_type motor);
 void BLDC_apply_pwm(unsigned int positive, unsigned int negative, unsigned char hall_state);
+void check_hall_effect(manual_state_t manual_state);
 //inline _iq current_controller(_iq Ref, _iq Fdb);
 
 void check_potentiometer(motion_state_struct *state);
@@ -475,8 +472,8 @@ extern interpolated_trajectory_struct ip_trajectory;	/*!< Struct that keeps inte
 extern circle_trajectory_struct circle_trajectory;		/*!< Struct that keeps trajectory in circle mode */
 extern PIDREG pv_control_pid;		/*!< PID struct for velocity control */
 extern PIDREG pv_control_pid_mms;		/*!< PID struct for velocity control */
+extern PIDREG am_control_pid_mms;		/*!< PID struct for velocity control */
 extern PIDCONTROLLER pv_position_control_pid;
-extern PIDCONTROLLER pv_position_control_pid_test;
 extern PIDREG position_control_pid;	/*!< PID struct for position control */
 extern PIDREG position_control_pid_mms;/*!< PID struct for position control */
 extern PIDREG16 position_control_pid_mms_iq16;
@@ -517,6 +514,8 @@ extern long accum_resolver_vel;
 extern unsigned short Half_Period;
 extern unsigned char flagDebugScia; // Flag to control de Debug System from SCI
 extern long long tmp_red;
+
+extern manual_state_t manual_state;	/*!< state of the manual mode */
 
 #include "canopen_amc.h"			//These "includes" are here because they need some of the previous "defines"
 #include "drive_state_machine.h"
