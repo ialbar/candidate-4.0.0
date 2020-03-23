@@ -3074,7 +3074,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                     		{ RW, uint32, 4, (void*)&FAULT_HALL_ERROR_TIMEOUT },
                     		{ RW, uint32, 4, (void*)&FAULT_RATCHET_ERROR_TIMEOUT },
                     		{ RW, uint32, 4, (void*)&FAULT_OVERCURRENT_ERROR_TIMEOUT },
-                    };                     
+                    };
 /**************************************************************************/
 /* Declaration of pointed variables                                       */
 /**************************************************************************/
@@ -3292,7 +3292,7 @@ const indextable amc_od_objdict[] =
   { (subindex*)amc_od_IndexFF50,sizeof(amc_od_IndexFF50)/sizeof(amc_od_IndexFF50[0]), 0xFF50},
   { (subindex*)amc_od_IndexFF51,sizeof(amc_od_IndexFF51)/sizeof(amc_od_IndexFF51[0]), 0xFF51},
   { (subindex*)amc_od_IndexFF52,sizeof(amc_od_IndexFF52)/sizeof(amc_od_IndexFF52[0]), 0xFF52},
-  
+
 };
 
 
@@ -3511,9 +3511,9 @@ const indextable * amc_od_scanIndexOD (UNS16 wIndex, UNS32 * errorCode, ODCallba
         case 0xFF4E: i = 206;break;
         case 0xFF4F: i = 207;break;
         case 0xFF50: i = 208;break;
-        case 0xFF51: i = 206;break;
-        case 0xFF52: i = 207;break;
-        
+        case 0xFF51: i = 209;break;
+        case 0xFF52: i = 210;break;
+
 		default:
 			*errorCode = OD_NO_SUCH_OBJECT;
 			return NULL;
