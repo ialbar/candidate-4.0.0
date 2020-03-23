@@ -3513,7 +3513,7 @@ const indextable * amc_od_scanIndexOD (UNS16 wIndex, UNS32 * errorCode, ODCallba
         case 0xFF50: i = 208;break;
         case 0xFF51: i = 209;break;
         case 0xFF52: i = 210;break;
-// rebase
+
 		default:
 			*errorCode = OD_NO_SUCH_OBJECT;
 			return NULL;
