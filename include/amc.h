@@ -474,6 +474,7 @@ extern PIDREG pv_control_pid;		/*!< PID struct for velocity control */
 extern PIDREG pv_control_pid_mms;		/*!< PID struct for velocity control */
 extern PIDREG am_control_pid_mms;		/*!< PID struct for velocity control */
 extern PIDCONTROLLER pv_position_control_pid;
+extern PIDCONTROLLER pv_position_control_pid_test;
 extern PIDREG position_control_pid;	/*!< PID struct for position control */
 extern PIDREG position_control_pid_mms;/*!< PID struct for position control */
 extern PIDREG16 position_control_pid_mms_iq16;
@@ -515,7 +516,6 @@ extern unsigned short Half_Period;
 extern unsigned char flagDebugScia; // Flag to control de Debug System from SCI
 extern long long tmp_red;
 
-extern manual_state_t manual_state;	/*!< state of the manual mode */
 
 #include "canopen_amc.h"			//These "includes" are here because they need some of the previous "defines"
 #include "drive_state_machine.h"

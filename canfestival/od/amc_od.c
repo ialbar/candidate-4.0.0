@@ -205,6 +205,7 @@ UNS32 Quick_stop_deceleration = 0x0;		/* Mapped at index 0x6085, subindex 0x01 *
 INTEGER32 Quick_stop_offset = 0x0;		        /* Mapped at index 0x6085, subindex 0x02 */
 UNS32 Quick_ramp_time = 0x0;		        /* Mapped at index 0x6085, subindex 0x03 */
 UNS16 Quick_mode_change_time = MINIMUM_MODE_CHANGE_TIME; /* Mapped at index 0x6085, subindex 0x04 */
+UNS8  Current_ramp_quick_stop = 0; 			/* Mapped at index 0x6085, subindex 0x05 */
 INTEGER8 Position_notation_index = 0x0;		/* Mapped at index 0x6089, subindex 0x00 */
 UNS8 Position_dimension_index = 0x1;		/* Mapped at index 0x608A, subindex 0x00 */
 INTEGER8 Velocity_notation_index = 0x0;		/* Mapped at index 0x608B, subindex 0x00 */
@@ -776,6 +777,8 @@ UNS32 FAULT_VEL_LIMIT_ERROR_TIMEOUT = 5000;
 UNS32 FAULT_HALL_ERROR_TIMEOUT = 5000;
 UNS32 FAULT_RATCHET_ERROR_TIMEOUT = 5000;
 UNS32 FAULT_OVERCURRENT_ERROR_TIMEOUT = 5000;
+
+UNS32 Max_detent_velocity = 100;
 /**************************************************************************/
 /* Declaration of value range types                                       */
 /**************************************************************************/
@@ -1873,7 +1876,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
                      };
 
 /* index 0x6085 :   Mapped variable Quick stop deceleration */
-                    INTEGER8 amc_od_highestSubIndex_obj6085 = 4; /* number of subindex - 1*/
+                    INTEGER8 amc_od_highestSubIndex_obj6085 = 5; /* number of subindex - 1*/
                     subindex amc_od_Index6085[] =
                      {
                        { RO, int8, 1, (void*)&amc_od_highestSubIndex_obj6085 },
@@ -1881,6 +1884,7 @@ $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 					   { RW, int32, 4, (void*)&Quick_stop_offset },
 					   { RW, uint32, 4, (void*)&Quick_ramp_time },
 					   { RW, uint16, 2, (void*)&Quick_mode_change_time },
+					   { RW, int8, 1, (void*)&Current_ramp_quick_stop },
                      };
 
 /* index 0x6089 :   Mapped variable Position notation index */

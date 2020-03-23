@@ -206,6 +206,7 @@ extern UNS32 Quick_stop_deceleration;	/* Mapped at index 0x6085, subindex 0x01*/
 extern INTEGER32 Quick_stop_offset;		/* Mapped at index 0x6085, subindex 0x02*/
 extern UNS32 Quick_ramp_time;			/* Mapped at index 0x6085, subindex 0x03*/
 extern UNS16 Quick_mode_change_time;	/* Mapped at index 0x6085, subindex 0x04*/
+extern UNS8 Current_ramp_quick_stop;	/* Mapped at index 0x6085, subindex 0x05*/
 extern INTEGER8 Position_notation_index;		/* Mapped at index 0x6089, subindex 0x00*/
 extern UNS8 Position_dimension_index;		/* Mapped at index 0x608A, subindex 0x00*/
 extern INTEGER8 Velocity_notation_index;		/* Mapped at index 0x608B, subindex 0x00*/
@@ -531,6 +532,10 @@ extern UNS32 FAULT_VEL_LIMIT_ERROR_TIMEOUT;
 extern UNS32 FAULT_HALL_ERROR_TIMEOUT;
 extern UNS32 FAULT_RATCHET_ERROR_TIMEOUT;
 extern UNS32 FAULT_OVERCURRENT_ERROR_TIMEOUT;
+
+extern UNS32 Max_detent_velocity;
+
+
 
 #define MINIMUM_MODE_CHANGE_TIME 50
 

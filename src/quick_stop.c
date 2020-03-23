@@ -122,36 +122,20 @@ void quick_stop_control( motion_state_struct *state, int mode )
 
 	TickDebugSci14bytesPositionMode();
 
-
-
     if (ramp_time == 0)
 	{
 		SET_POWER_OFF();
 
 		if( !reload_change_time )
 		{
-#if 0
-			test_current_ref = current_control_pid.Ref;
-
-			current_control_pid.Ki = _IQmpy(current_control_pid.Ki,_IQ(4.0));
-			//control_effort = _IQ (0.0);
-  			//current_control_pid.Ref =_IQ(0.0);
-			/* Set motor current sign in final_current */
-#endif
 			reload_change_time = 1;
 			mode_change_time = maximum(Quick_mode_change_time, MINIMUM_MODE_CHANGE_TIME);
-#if 0
-			factor_current_down = _IQ16toIQ(_IQ16div(_IQtoIQ16(current_control_pid.Ref),_IQ16(mode_change_time)));
-#endif
+			if (Current_ramp_quick_stop)
+				factor_current_down = _IQ16toIQ(_IQ16div(_IQtoIQ16(current_control_pid.Ref),_IQ16(mode_change_time)));
 
 		}
-//		test_current_ref = test_current_ref - factor_current_down;
-		//current_control_pid.Ref = current_control_pid.Ref - factor_current_down;
-#if 0
-		control_effort = control_effort - factor_current_down;
-#endif
-//		if (current_control_pid.Ref < _IQ(0.0))
-//			current_control_pid.Ref =_IQ(0.0);
+		if (Current_ramp_quick_stop)
+			control_effort = control_effort - factor_current_down;
 	}
 
 	if( reload_change_time && mode_change_time == 0 )

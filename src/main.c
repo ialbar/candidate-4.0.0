@@ -194,7 +194,7 @@ extern short debug_velocity_target = 0;
 
 long long tmp_red = 0;
 
-manual_state_t manual_state = DETENTS_INACTIVE;	/*!< state of the manual mode */
+
 int in_quick_stop =0;
 
 //#define RESOLVER_DEBUG
