@@ -1,0 +1,222 @@
+/*!	\file manual_mode.c
+	\brief Functions for Manual Mode (with software detents)
+*/
+
+#include "amc.h"
+#include "debug_sci.h"
+
+static manual_state_t manual_state = DETENTS_INACTIVE;	/*!< state of the manual mode */
+static long current_detent_pos;			/*!< position of the detent active [inc] */
+static _iq duty_limit = 0;		/*!< Duty cycle limit used in detents */
+
+
+/*****************************************************************/
+/*!	 Main function of Manual Mode
+	\param state Cinematic state of the system
+	\param init will be 1 if the mode has to be initialized (0 if not)
+*/
+/*****************************************************************/
+void manual_mode_operation(motion_state_struct *state, char init)
+{
+	int reset_timers = 0;
+
+	if(init)
+	{
+		manual_initialize(state);		/* initialize the mode if necessary */
+		reset_timers = 1;
+		/* if a cluth is used for manual mode use external absolute sensors */
+		if (Axle_clutch_Position)
+		{
+			ATM_seti(&manual_with_clutch, 1);
+			ATM_seti(&reset_filters, 1);
+		}
+	}
+  switch(manual_state)
+	{
+
+	case DETENTS_INACTIVE:
+		release_clutch();
+    	ATM_seti(&ready_to_power_on, 0);
+		if (detent_nearby(int2ext_pos(state->position, Home_offset), &Detents_config_Active_detent) &&
+			(int2ext_vel(labs(state->velocity)) <= Detents_config_Max_velocity))
+		{
+			manual_initialize(state);		/* initialize the mode */
+			manual_state = DETENTS_ACTIVE;
+			current_detent_pos = ext2int_pos(Detents_config_Active_detent, Home_offset);	/* converto to internal units */
+			reset_timers = 1;
+
+			/* update Position_demand_value and Position_demand_value_in_increments */
+			Position_demand_value_in_increments = current_detent_pos;	/* [inc] */
+			Position_demand_value = Detents_config_Active_detent;		/* [position units] */
+		}
+		break;
+
+	case DETENTS_ACTIVE:
+		activate_clutch();
+		control_effort = _IQsat(position_controller_manual(current_detent_pos, state->position), duty_limit, -duty_limit);
+		ATM_seti(&ready_to_power_on, 1);
+
+		/* leave detent if Detents_config_Leave is '1' */
+		if (Detents_config_Leave)
+			manual_state = DETENTS_LEAVING;
+
+		/* became inactive if position is too far from detent point */
+		if (int2ext_pos(labs(state->position - current_detent_pos), 0) > Detents_config_Max_distance)
+			manual_state = DETENTS_INACTIVE;
+		break;
+
+	case DETENTS_LEAVING:
+		release_clutch();
+		ATM_seti(&ready_to_power_on, 0);
+		if (!detent_nearby(int2ext_pos(state->position, Home_offset), &current_detent_pos))
+			manual_state = DETENTS_INACTIVE;
+		break;
+
+	default:		/* should never happen */
+		manual_state = DETENTS_INACTIVE;
+		break;
+	}
+
+	manual_status_flags(manual_state, current_detent_pos, state, reset_timers);
+
+	/* Debug */
+#ifdef DEBUG_MANUAL_LOOP
+	TickDebugSci14bytesManualMode();
+#endif
+
+
+}
+
+
+/*****************************************************************/
+/*!	 Initializations of Manual Mode
+	\param state Cinematic state of the system
+*/
+/*****************************************************************/
+void manual_initialize(motion_state_struct *state)
+{
+	unsigned long ul_tmp;
+
+	/* mode specific initializations */
+	manual_state = DETENTS_INACTIVE;
+	Detents_config_Leave = 0;
+	ATM_seti(&ready_to_power_on, 0);
+
+	/* reset mode specific bits of Statusword */
+	Device_status_word &= ~(TARGET_REACHED_MASKBIT | DETENT_ACTIVE_MASKBIT | FOLLOWING_ERROR_MASKBIT);
+
+	/* initialize PID */
+	position_control_pid.Err = 0;
+	position_control_pid.Up = 0;
+	position_control_pid.Ui = 0;
+	position_control_pid.Ud = 0;
+	position_control_pid.OutPreSat = 0;
+	position_control_pid.Out = 0;
+	position_control_pid.SatErr = 0;
+	position_control_pid.Err1 = 0;
+
+	ul_tmp = Manual_Detent_control_parameters[0];		/* Kp (has to be divided by Divisor) */
+	ul_tmp = ul_tmp << 16;							/* multiply by 2^16 */
+	ul_tmp /= Manual_Detent_control_parameters[4];			/* divide by Divisor */
+	position_control_pid.Kp = ul_tmp << (GLOBAL_Q - 16);		/* convert to IQ and divide by 2^16 */
+
+	ul_tmp = Manual_Detent_control_parameters[1];		/* Ki (has to be divided by Divisor) */
+	ul_tmp = ul_tmp << 16;						/* multiply by 2^16 */
+	ul_tmp /= Manual_Detent_control_parameters[4];			/* divide by Divisor */
+	position_control_pid.Ki = _IQmpyI32(_IQ(0.0000152587890625),ul_tmp);	/* divide by 2^16 */
+
+	ul_tmp = Manual_Detent_control_parameters[2];		/* Kd (has to be divided by Divisor) */
+	ul_tmp = ul_tmp << 16;						/* multiply by 2^16 */
+	ul_tmp /= Manual_Detent_control_parameters[4];			/* divide by Divisor */
+	position_control_pid.Kd = _IQmpyI32(_IQ(0.0000152587890625),ul_tmp);	/* divide by 2^16 */
+
+	ul_tmp = Manual_Detent_control_parameters[3];		/* Kc (has to be divided by Divisor) */
+	ul_tmp = ul_tmp << 16;						/* multiply by 2^16 */
+	ul_tmp /= Manual_Detent_control_parameters[4];			/* divide by Divisor */
+	position_control_pid.Kc = _IQmpyI32(_IQ(0.0000152587890625),ul_tmp);	/* divide by 2^16 */
+
+	/* initialize duty_limit */
+	duty_limit = _IQmpyI32(_IQ(0.001), (long)Detents_config_Max_duty);
+
+	DINT;
+	p_current_limit = &current_limit;	/* set current limit to use */
+	EINT;
+}
+
+/*****************************************************************/
+/*!	 Sets Manual Mode status flags (Target Reached and Detent Active)
+	\param manual_state State of the Manual Mode state machine
+	\param detent Position of the active detent (if any) [inc]
+	\param state Cynematic state (position, velocity and time)
+	\param reset If reset = 1, timers will be restarted
+*/
+/*****************************************************************/
+void manual_status_flags(manual_state_t manual_state, long int detent, motion_state_struct *state, int reset)
+{
+	static long long t_reached_started = 0;
+	unsigned long long tmp;
+
+	if( reset ) t_reached_started = 0;
+
+	/* manage Detent Active status flag */
+	if (manual_state == DETENTS_ACTIVE)
+	{
+		Device_status_word |= DETENT_ACTIVE_MASKBIT;		/* set Detent Active flag */
+		/* manage Target Reached status flag */
+		if (labs(int2ext_pos(state->position - detent, 0)) <= Position_window)
+		{
+			if(!t_reached_started) t_reached_started = state->time;		/* Start time counting if not started */
+			tmp = (long long)(state->time - t_reached_started) * 1000;
+			tmp /= lcounts_p_s;
+			if(tmp > Position_window_time)
+				Device_status_word |= TARGET_REACHED_MASKBIT;			/* set Target Reached flag */
+		}
+		else
+		{
+			t_reached_started = 0;			/* stop time counting */
+		}
+	}
+	else
+	{
+		Device_status_word &= ~DETENT_ACTIVE_MASKBIT;		/* clear Detent Active flag */
+		Device_status_word &= ~TARGET_REACHED_MASKBIT;		/* clear Target Reached flag */
+	}
+}
+
+/*****************************************************************/
+/*!	 Calculates the PID output in Profile Position Mode
+	\param demand Position demand for this control cycle
+	\param position Current position
+	\return PID output [-1,1]
+*/
+/********************************************************labs(Software_position_limit_Max_position_limit-Software_position_limit_Min_position_limit)*********/
+_iq position_controller_manual(long int demand, long int position)
+{
+	long long tmp;
+
+	if(!pos_error_normFactor) return 0;
+
+#if 0
+	position_control_pid.Kp = _IQ(6.0);
+	position_control_pid.Ki = _IQ(0.5);
+	position_control_pid.Kc = _IQ(0.32);
+	position_control_pid.Kd = _IQ(0.275);
+#endif
+
+	tmp = (long long)(position - demand) * Position_factor_Feed_constant;
+	tmp = tmp << 5;	/* multiply by 32 to avoid resolut	return position_control_pid.Out;ion losses */
+	tmp /= Position_factor_Numerator;					/* tmp = 32 * error [position units] */
+	if(llabs(tmp) > (long long)(pos_error_normFactor<<5))
+		tmp = sign(tmp) * (long long)(pos_error_normFactor<<5); /* limit the error to 'Position_control_margin' */
+
+	/* reference position is always '0' and current position is set as the relative error */
+	position_control_pid.Ref = _IQ(0);
+	/* Divide by normFactor and later convert to IQ and divide by 2^5 */
+	position_control_pid.Fdb = (tmp << (GLOBAL_Q - 5)) / pos_error_normFactor ;	/* position error related to 'Position_control_margin' */
+
+	position_control_pid.calc(&position_control_pid);		/* calculate PID output */
+
+	return position_control_pid.Out;
+}
+
+
